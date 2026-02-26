@@ -10,7 +10,7 @@ Reducing `generateTupleCombinatorsTo` from 22 to 9 in Airstream eliminates the 3
 
 ## Context
 
-**Issue**: After upgrading from Laminar 17 to 18, a 192-file / 45K-LOC project (gaiaPdfTool) compiles in 59s — roughly 3x slower than before. A colleague asked "why it's slower."
+**Issue**: After upgrading from Laminar 17 to 18, large projects report significantly slower compilation — roughly 3x slower than before.
 
 **What was tried in the real codebase (all failed):**
 
@@ -180,7 +180,7 @@ cd compile-bench
 
 ## Benchmark Design
 
-Source files simulate patterns from a real 192-file / 45K-LOC Laminar application:
+Source files simulate patterns from a real-world Laminar application:
 
 | Category | Files | Pattern | Why it stresses the compiler |
 |----------|-------|---------|------------------------------|
