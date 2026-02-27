@@ -8,6 +8,8 @@ Measures and **proves the root cause** of the compile-time regression introduced
 
 Reducing `generateTupleCombinatorsTo` from 22 to 9 in Airstream eliminates the 3.3x compile-time regression entirely. Switching from `tuplez-full` to `tuplez-full-light` alone has zero effect.
 
+**Update:** Airstream commit `7bf3aee` (removes implicit value class conversions for N-arity combinators, moves methods directly into `EventStream`/`Signal` traits) fixes the regression while keeping arity 22. bench-v18-C confirms this: **9.8s** — even faster than v17 (11.3s).
+
 ## Context
 
 **Issue**: After upgrading from Laminar 17 to 18, large projects report significantly slower compilation — roughly 3x slower than before.
@@ -29,23 +31,25 @@ Reducing `generateTupleCombinatorsTo` from 22 to 9 in Airstream eliminates the 3
 
 | Project | Mean | SD | vs v17 |
 |---------|------|----|--------|
-| bench-v17 (Laminar 17.2.0) | 11.9s | 0.1s | baseline |
-| bench-v18 (Laminar 18.0.0-M2) | 39.3s | 0.1s | **3.3x** |
+| bench-v17 (Laminar 17.2.0) | 11.3s | 0.1s | baseline |
+| bench-v18 (Laminar 18.0.0-M2) | 39.0s | 0.3s | **3.45x** |
 
 ### Phase 2: Prove the root cause (modified Airstream experiments)
 
 | Variant | Airstream config | Mean | vs v17 |
 |---------|-----------------|------|--------|
-| **v17** | Laminar 17 baseline | **11.9s** | **1.00x** |
-| **v18** | tuplez-full, arity 22 (stock v18) | **39.3s** | **3.30x** |
-| **v18-A** | tuplez-full-light, arity 9 | **12.3s** | **1.03x** |
-| **v18-B** | tuplez-full-light, arity 22 | **39.4s** | **3.30x** |
+| **v17** | Laminar 17 baseline | **11.3s** | **1.00x** |
+| **v18** | tuplez-full, arity 22 (stock v18) | **39.0s** | **3.45x** |
+| **v18-A** | tuplez-full-light, arity 9 | **12.0s** | **1.05x** |
+| **v18-B** | tuplez-full-light, arity 22 | **38.5s** | **3.40x** |
+| **v18-C** | stock Laminar 18 + Airstream fix (`7bf3aee`) | **9.8s** | **0.87x** |
 
 **Interpretation:**
 
 - **v18-A** (arity 9) = essentially identical to v17. Regression **eliminated**.
 - **v18-B** (arity 22, light tuplez) = just as slow as stock v18. Tuplez variant is **irrelevant**.
-- **Conclusion: the arity count (22 generated overloads) is the sole cause.**
+- **v18-C** (Airstream fix, arity 22) = **faster than v17**. The fix removes implicit value class conversions and moves combinator methods directly into `EventStream`/`Signal` traits, eliminating the overload resolution overhead while keeping full arity support.
+- **Conclusion: the arity count (22 generated overloads) was the sole cause, and Airstream commit `7bf3aee` fully resolves it.**
 
 ### TASTy output sizes (identical across variants)
 
@@ -113,7 +117,7 @@ git clone https://github.com/nguyenyou/laminar-compile-bench.git
 cd laminar-compile-bench
 
 # Verify all variants compile
-sbt bench-v17/compile bench-v18/compile bench-v18-A/compile bench-v18-B/compile
+sbt bench-v17/compile bench-v18/compile bench-v18-A/compile bench-v18-B/compile bench-v18-C/compile
 
 # Run the full benchmark (3 iterations per variant)
 ./run-experiment.sh 3
@@ -163,6 +167,7 @@ cd compile-bench
 ├── bench-v18/src/main/scala/bench/    # 51 files — Laminar 18.0.0-M2 (stock)
 ├── bench-v18-A/src/main/scala/bench/  # 51 files — Laminar 18.0.0-bench-A (light, arity 9)
 ├── bench-v18-B/src/main/scala/bench/  # 51 files — Laminar 18.0.0-bench-B (light, arity 22)
+├── bench-v18-C/src/main/scala/bench/  # 51 files — Laminar 18.0.0-M2 + Airstream fix
 │   ├── Model.scala                    # Sealed trait with 15 case classes
 │   ├── HeavyCombine_01..10.scala      # combineWith chains, arities 2-5
 │   ├── ReactiveDSL_01..10.scala       # Dense element trees, reactive bindings
@@ -200,3 +205,4 @@ Source files simulate patterns from a real-world Laminar application:
 - **Laminar v18**: 18.0.0-M2
 - **Laminar v18-A**: 18.0.0-bench-A (Airstream: tuplez-full-light, arity 9)
 - **Laminar v18-B**: 18.0.0-bench-B (Airstream: tuplez-full-light, arity 22)
+- **Laminar v18-C**: 18.0.0-M2 + Airstream 18.0.0-M2-SNAPSHOT (commit `7bf3aee` — no implicit value class conversions)
